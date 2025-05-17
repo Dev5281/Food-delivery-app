@@ -11,18 +11,24 @@ const mongoDB = require('./db');
 
 mongoDB();
 
-app.use(cors());
-app.use((req, res, next) => {
-  const allowedOrigins = ['http://localhost:3000', 'https://food-delivery-app-yv9d.onrender.com'];
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  next();
-});
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? ['https://food-delivery-app-yv9d.onrender.com']  // Replace with your actual deployed frontend URL
+  : ['http://localhost:3000'];
 
+// Use CORS middleware with options
+app.use(cors({
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use('/api', require("./Routes/CreateUser"));
 app.use('/api', require("./Routes/DisplayData"));
