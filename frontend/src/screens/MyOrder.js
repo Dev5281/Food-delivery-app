@@ -18,7 +18,7 @@ export default function MyOrder() {
     try {
       console.log('Fetching orders for:', userEmail);
       
-      const response = await fetch("http://localhost:5000/api/orderData", {
+      const response = await fetch("/api/orderData", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

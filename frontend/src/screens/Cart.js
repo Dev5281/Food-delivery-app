@@ -20,7 +20,7 @@ export default function Cart() {
       alert("User email is missing! Please log in.");
       return;
     }
-    let response = await fetch("http://localhost:5000/api/orderdata", {
+    let response = await fetch("/api/orderdata", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
