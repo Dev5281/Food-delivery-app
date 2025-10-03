@@ -13,13 +13,15 @@ const mongoDB = async () => {
     const fetched_category = await mongoose.connection.db.collection('foodcategory').find({}).toArray();
 
     if (fetched_data.length === 0) {
-      console.log('No data found in food_items collection');
+       console.log('⚠️ WARNING: No data found in food_items collection');
+       global.food_items = [];
     } else {
       global.food_items = fetched_data;
     }
 
     if (fetched_category.length === 0) {
-      console.log('No data found in foodCategory collection');
+      console.log('⚠️ WARNING: No data found in foodCategory collection');
+      global.foodcategory = [];
     } else {
       global.foodcategory = fetched_category;
     }

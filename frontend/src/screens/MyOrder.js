@@ -49,7 +49,7 @@ export default function MyOrder() {
       setError(error.message || "Failed to fetch orders. Please try again later.");
       setOrderData([]);
     } finally {
-      setLoading(false);
+      setLoading(false); 
     }
   };
 

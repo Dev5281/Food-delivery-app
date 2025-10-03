@@ -36,7 +36,7 @@ export default function Home() {
             setCurrentIndex((prevIndex) => (prevIndex + 1) % 5); 
         }, 3000);
 
-        return () => clearInterval(interval); 
+        return () => clearInterval(interval);
     }, []);
 
     const images = [
