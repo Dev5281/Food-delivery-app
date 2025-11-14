@@ -11,28 +11,34 @@ const mongoDB = require('./db');
 
 mongoDB();
 
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? ['https://food-delivery-app-yv9d.onrender.com']  
-  : ['http://localhost:3000'];
-
-
-app.use(cors({
-  origin: function(origin, callback) {
-    
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true,
-}));
+// CORS configuration - more permissive in development
+if (process.env.NODE_ENV === 'production') {
+  app.use(cors({
+    origin: 'https://food-delivery-app-yv9d.onrender.com',
+    credentials: true,
+  }));
+} else {
+  // In development, allow all origins
+  app.use(cors({
+    origin: true, // Allow all origins in development
+    credentials: true,
+  }));
+}
 app.use(express.json());
-app.use('/api', require("./Routes/CreateUser"));
-app.use('/api', require("./Routes/DisplayData"));
-app.use('/api', require("./Routes/OrderData"));
+
+// Load routes with error handling
+try {
+  console.log('Loading routes...');
+  app.use('/api', require("./Routes/CreateUser"));
+  console.log('✅ CreateUser route loaded');
+  app.use('/api', require("./Routes/DisplayData"));
+  console.log('✅ DisplayData route loaded');
+  app.use('/api', require("./Routes/OrderData"));
+  console.log('✅ OrderData route loaded');
+} catch (error) {
+  console.error('❌ Error loading routes:', error);
+  throw error; // Re-throw to prevent server from starting with broken routes
+}
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/build')));
@@ -43,6 +49,28 @@ if (process.env.NODE_ENV === 'production') {
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
+});
+
+// Global error handler - ensures all errors return JSON
+// Must have 4 parameters to be recognized as error handler
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err.message || err);
+  console.error('Stack:', err.stack);
+  
+  // Don't send error if response already sent
+  if (res.headersSent) {
+    return next(err);
+  }
+  
+  res.status(err.status || 500).json({
+    message: err.message || 'Internal Server Error',
+    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
 });
 
 app.listen(port, () => {

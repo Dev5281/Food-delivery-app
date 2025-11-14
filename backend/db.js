@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const mongoURI = 'mongodb+srv://Admin:Devbullet500@cluster0.v48a9.mongodb.net/gofoodmern?retryWrites=true&w=majority';
 
+// Initialize global variables to prevent undefined errors
+global.food_items = [];
+global.foodcategory = [];
+
 const mongoDB = async () => {
   try {
     await mongoose.connect(mongoURI);
@@ -17,6 +21,7 @@ const mongoDB = async () => {
        global.food_items = [];
     } else {
       global.food_items = fetched_data;
+      console.log(`✅ Loaded ${global.food_items.length} food items`);
     }
 
     if (fetched_category.length === 0) {
@@ -24,13 +29,17 @@ const mongoDB = async () => {
       global.foodcategory = [];
     } else {
       global.foodcategory = fetched_category;
+      console.log(`✅ Loaded ${global.foodcategory.length} food categories`);
     }
 
-    console.log('Fetched food_items:', global.food_items);
-    console.log('Fetched foodcategory:', global.foodcategory);
+    console.log('Fetched food_items:', global.food_items.length, 'items');
+    console.log('Fetched foodcategory:', global.foodcategory.length, 'categories');
     
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
+    // Keep empty arrays so the server doesn't crash
+    global.food_items = [];
+    global.foodcategory = [];
   }
 };
 

@@ -19,11 +19,40 @@ export default function Home() {
                 }
             });
 
-            response = await response.json();
-            setFoodItem(response[0]);
-            setFoodCat(response[1]);
+            // Check content type before parsing
+            const contentType = response.headers.get("content-type");
+            let data;
+            
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                // If not JSON, read as text to see what we got
+                const text = await response.text();
+                console.error("Server returned non-JSON response:", text.substring(0, 200));
+                setFoodItem([]);
+                setFoodCat([]);
+                return;
+            }
+
+            if (!response.ok) {
+                console.error("Error fetching data:", data.message || "Failed to fetch food data");
+                setFoodItem([]);
+                setFoodCat([]);
+                return;
+            }
+
+            if (Array.isArray(data) && data.length === 2) {
+                setFoodItem(data[0] || []);
+                setFoodCat(data[1] || []);
+            } else {
+                console.error("Unexpected response format:", data);
+                setFoodItem([]);
+                setFoodCat([]);
+            }
         } catch (error) {
             console.error("Error fetching data:", error);
+            setFoodItem([]);
+            setFoodCat([]);
         }
     };
     useEffect(() => {
