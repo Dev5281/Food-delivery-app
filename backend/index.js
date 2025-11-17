@@ -11,19 +11,38 @@ const mongoDB = require('./db');
 
 mongoDB();
 
-// CORS configuration - more permissive in development
-if (process.env.NODE_ENV === 'production') {
-  app.use(cors({
-    origin: 'https://food-delivery-app-yv9d.onrender.com',
-    credentials: true,
-  }));
-} else {
-  // In development, allow all origins
-  app.use(cors({
-    origin: true, // Allow all origins in development
-    credentials: true,
-  }));
-}
+// CORS configuration
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? [
+      'https://food-delivery-app-yv9d.onrender.com',
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+      process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null,
+    ].filter(Boolean)
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production') {
+      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        return callback(null, true);
+      }
+    }
+    
+    // In production, check allowed origins or allow Vercel domains
+    if (process.env.NODE_ENV === 'production') {
+      if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
+        return callback(null, true);
+      }
+    }
+    
+    callback(null, true); // Allow all for now - you can restrict this later
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Load routes with error handling
@@ -73,6 +92,12 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-app.listen(port, () => {
-  console.log(`Server is listening on port ${port}`);
-});
+// Only listen if not in Vercel serverless environment
+if (process.env.VERCEL !== '1') {
+  app.listen(port, () => {
+    console.log(`Server is listening on port ${port}`);
+  });
+}
+
+// Export for Vercel serverless functions
+module.exports = app;
