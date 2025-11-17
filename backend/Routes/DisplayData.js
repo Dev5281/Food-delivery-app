@@ -5,13 +5,13 @@ const mongoose = require('mongoose');
 // Helper function to ensure MongoDB connection
 const ensureConnection = async () => {
     try {
+        const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://Admin:Devbullet500@cluster0.v48a9.mongodb.net/gofoodmern?retryWrites=true&w=majority';
+        
         // Check connection state: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
         if (mongoose.connection.readyState === 0 || mongoose.connection.readyState === 3) {
-            const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://Admin:Devbullet500@cluster0.v48a9.mongodb.net/gofoodmern?retryWrites=true&w=majority';
-            
             // Set connection options to avoid conflicts
             const options = {
-                serverSelectionTimeoutMS: 5000,
+                serverSelectionTimeoutMS: 10000,
                 socketTimeoutMS: 45000,
             };
             
@@ -20,18 +20,48 @@ const ensureConnection = async () => {
         } else if (mongoose.connection.readyState === 2) {
             // If connecting, wait for connection
             await new Promise((resolve, reject) => {
-                mongoose.connection.once('connected', resolve);
+                mongoose.connection.once('open', resolve);
                 mongoose.connection.once('error', reject);
-                setTimeout(() => reject(new Error('Connection timeout')), 10000);
+                setTimeout(() => reject(new Error('Connection timeout')), 15000);
             });
         }
         
-        // Wait a bit to ensure connection is fully ready
-        if (!mongoose.connection.db) {
-            throw new Error('MongoDB connection not ready');
+        // Wait for the connection to be fully open
+        if (mongoose.connection.readyState !== 1) {
+            await new Promise((resolve, reject) => {
+                if (mongoose.connection.readyState === 1) {
+                    resolve();
+                } else {
+                    mongoose.connection.once('open', resolve);
+                    mongoose.connection.once('error', reject);
+                    setTimeout(() => reject(new Error('Connection not ready')), 5000);
+                }
+            });
         }
         
-        return mongoose.connection.db;
+        // Get database - try multiple methods
+        let db = mongoose.connection.db;
+        
+        // If db is not available, try getting it from the client
+        if (!db && mongoose.connection.getClient) {
+            const client = mongoose.connection.getClient();
+            const dbName = mongoURI.split('/').pop().split('?')[0];
+            db = client.db(dbName);
+            console.log('📦 Got database from client');
+        }
+        
+        // Last resort: wait a bit and retry
+        if (!db) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            db = mongoose.connection.db;
+        }
+        
+        if (!db) {
+            throw new Error('MongoDB database object not available after connection');
+        }
+        
+        console.log('✅ MongoDB database object ready');
+        return db;
     } catch (error) {
         console.error('❌ Error ensuring MongoDB connection:', error);
         throw error;
