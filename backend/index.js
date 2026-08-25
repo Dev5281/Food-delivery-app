@@ -54,6 +54,8 @@ try {
   console.log('✅ DisplayData route loaded');
   app.use('/api', require("./Routes/OrderData"));
   console.log('✅ OrderData route loaded');
+  app.use('/api/payment', require("./Routes/Payment"));
+  console.log('✅ Payment route loaded');
 } catch (error) {
   console.error('❌ Error loading routes:', error);
   throw error; // Re-throw to prevent server from starting with broken routes

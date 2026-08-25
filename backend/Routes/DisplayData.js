@@ -127,6 +127,7 @@ router.post('/foodData', async (req, res) => {
         // Return empty arrays on error instead of crashing (frontend expects [items, categories])
         console.error("Returning empty arrays due to error");
         res.status(200).json([[], []]);
+        console.log(" sent an empty response due to  error");
     }
 });
 

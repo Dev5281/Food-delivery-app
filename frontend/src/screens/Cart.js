@@ -2,6 +2,23 @@ import React from 'react';
 import { MdDelete } from 'react-icons/md';
 import { UseCart, UseDispatchCart } from '../components/ContextReducer';
 
+const loadRazorpay = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+
+    script.onload = () => {
+      resolve(true);
+    };
+
+    script.onerror = () => {
+      resolve(false);
+    };
+
+    document.body.appendChild(script);
+  });
+};
 export default function Cart() {
   let data = UseCart() || [];  // ✅ Ensure `data` is always an array
   let dispatch = UseDispatchCart();
@@ -14,30 +31,171 @@ export default function Cart() {
   }
 
   const handleCheckOut = async () => {
-    let userEmail = localStorage.getItem("userEmail");
+  try {
+    // Check login
+    const userEmail = localStorage.getItem("userEmail");
+
     if (!userEmail) {
-      console.error("User email is missing! Please log in.");
-      alert("User email is missing! Please log in.");
+      alert("Please login before checkout.");
       return;
     }
-    let response = await fetch("/api/orderdata", {
-      method: 'POST',
+
+    // Load Razorpay
+    const isLoaded = await loadRazorpay();
+
+    if (!isLoaded) {
+      alert("Razorpay SDK failed to load.");
+      return;
+    }
+
+    // 1. Create Razorpay order
+    const response = await fetch("/api/payment/create-order", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        order_data: data,
-        email: userEmail,
-        order_date: new Date().toDateString()
+        amount: totalPrice
       })
     });
 
-    console.log("JSON RESPONSE:::::", response.status);
-    if (response.status === 200 && typeof dispatch === "function") {
-      dispatch({ type: "DROP" });
-    }
-  };
+    const result = await response.json();
 
+    console.log("Create order response:", result);
+
+    if (!response.ok || !result.success) {
+      alert("Unable to create payment order.");
+      return;
+    }
+
+    const razorpayOrder = result.order;
+
+    console.log("Razorpay Order ID:", razorpayOrder.id);
+
+    // 2. Open Razorpay Checkout
+    const options = {
+      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+
+      amount: razorpayOrder.amount,
+
+      currency: razorpayOrder.currency,
+
+      name: "GoFood",
+
+      description: "Food Order",
+
+      order_id: razorpayOrder.id,
+
+      prefill: {
+        email: userEmail
+      },
+
+      theme: {
+        color: "#3399cc"
+      },
+
+      // 3. Payment successful
+      handler: async function (paymentResponse) {
+
+        console.log("Payment response:", paymentResponse);
+
+        // 4. Verify payment on backend
+        const verifyResponse = await fetch(
+          "/api/payment/verify-payment",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+              razorpay_order_id:
+                paymentResponse.razorpay_order_id,
+
+              razorpay_payment_id:
+                paymentResponse.razorpay_payment_id,
+
+              razorpay_signature:
+                paymentResponse.razorpay_signature
+            })
+          }
+        );
+
+        const verificationResult =
+          await verifyResponse.json();
+
+        console.log(
+          "Payment verification:",
+          verificationResult
+        );
+
+        // Payment verification failed
+        if (!verificationResult.success) {
+          alert("Payment verification failed.");
+          return;
+        }
+
+        // 5. Create Order document
+        const orderResponse = await fetch(
+          "/api/orderdata",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+              email: userEmail,
+
+              order_data: data,
+
+              totalAmount: totalPrice,
+
+              paymentStatus: "paid",
+
+              razorpayOrderId:
+                paymentResponse.razorpay_order_id,
+
+              razorpayPaymentId:
+                paymentResponse.razorpay_payment_id,
+
+              razorpaySignature:
+                paymentResponse.razorpay_signature,
+
+              order_date: new Date().toISOString()
+            })
+          }
+        );
+
+        const savedOrder = await orderResponse.json();
+
+        console.log("Saved order:", savedOrder);
+
+        // 6. Clear cart ONLY after order is saved
+        if (orderResponse.ok && savedOrder.success) {
+          dispatch({ type: "DROP" });
+
+          alert("Payment successful! Order placed.");
+        } else {
+          alert(
+            "Payment succeeded but order could not be saved."
+          );
+        }
+      }
+    };
+
+    const razorpay = new window.Razorpay(options);
+
+    razorpay.open();
+
+  } catch (error) {
+    console.error("Checkout error:", error);
+
+    alert("Something went wrong during checkout.");
+  }
+};
   
   let totalPrice = data.reduce((total, food) => total + (Number(food.price) || 0), 0);
 
